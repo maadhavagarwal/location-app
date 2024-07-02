@@ -1,76 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
-const geoUrl = "https://gist.githubusercontent.com/mbostock/4090846/raw/world-110m.json";
+const userIcon = new L.Icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
-function TrackUserLocation() {
-  const [location, setLocation] = useState(null);
-  const [error, setError] = useState(null);
+export default function MapChart() {
+  const [userLocation, setUserLocation] = useState([19.4355233,72.7702886]); // Default to London
+  const [path, setPath] = useState([]); // Initialize with default location
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      const watcher = navigator.geolocation.watchPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-          setError(null);
-        },
-        (error) => {
-          setError(error.message);
-        }
-      );
+    const handlePositionUpdate = (position) => {
+      const { latitude, longitude } = position.coords;
+      const newLocation = [latitude, longitude];
+      setUserLocation(newLocation);
+      setPath((prevPath) => [...prevPath, newLocation]);
+    };
+    setInterval(() => {
+      navigator.geolocation.getCurrentPosition(handlePositionUpdate);
+      
+    }, 500);
+    const watchId = navigator.geolocation.watchPosition(handlePositionUpdate);
 
-      // Cleanup the watcher when the component unmounts
-      return () => {
-        navigator.geolocation.clearWatch(watcher);
-      };
-    } else {
-      setError('Geolocation is not supported by this browser.');
-    }
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   return (
-    <div>
-      {location ? (
-        <div>
-          <p>Latitude: {location.latitude}</p>
-          <p>Longitude: {location.longitude}</p>
-          <ComposableMap>
-            <Geographies geography={geoUrl}>
-              {({ geographies }) =>
-                geographies.map((geo) => (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    style={{
-                      default: { fill: "#D6D6FA" },
-                      hover: { fill: "#F53", outline: "none" },
-                      pressed: { fill: "#E42", outline: "none" },
-                    }}
-                  />
-                ))
-              }
-            </Geographies>
-            <Marker coordinates={[location.longitude, location.latitude]}>
-              <circle r={10} fill="#F23" />
-              <text
-                textAnchor="middle"
-                y={-20}
-                style={{ fontFamily: "system-ui", fill: "#5D5A6D" }}
-              >
-                You are here
-              </text>
-            </Marker>
-          </ComposableMap>
-        </div>
-      ) : (
-        <p>Loading location...</p>
-      )}
-      {error && <p>Error: {error}</p>}
-    </div>
+    <>
+    <div>{userLocation[0]}</div>
+    <div>{userLocation[1]}</div>
+    <MapContainer center={userLocation} zoom={13} style={{ height: "100vh", width: "90%",margin:"50px" }}>
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      />
+      <Marker position={userLocation} icon={userIcon}>
+        <Popup>
+          You are here
+        </Popup>
+      </Marker>
+      <Polyline positions={path} color="blue" />
+    </MapContainer>
+    </>
   );
 }
-
-export default TrackUserLocation;
